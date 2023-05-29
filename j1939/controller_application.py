@@ -1,5 +1,6 @@
 import logging
 import j1939
+from j1939.parameter_group_number import ParameterGroupNumber
 from .message_id import FrameFormat
 
 logger = logging.getLogger(__name__)
@@ -249,7 +250,7 @@ class ControllerApplication:
         mid = j1939.MessageId(priority=priority, parameter_group_number=parameter_group_number, source_address=self._device_address)
         self._ecu.send_message(mid.can_id, True, data)
 
-    def send_pgn(self, data_page, pdu_format, pdu_specific, priority, data, time_limit=0, frame_format=FrameFormat.FEFF):
+    def send_pgn(self, data_page, pdu_format, pdu_specific, priority, data, time_limit=0, frame_format=FrameFormat.FEFF, dest_address=ParameterGroupNumber.Address.GLOBAL):
         """send a pgn
         :param int data_page: data page
         :param int pdu_format: pdu format
@@ -263,7 +264,7 @@ class ControllerApplication:
         if self.state != ControllerApplication.State.NORMAL:
             raise RuntimeError("Could not send message unless address claiming has finished")
 
-        return self._ecu.send_pgn(data_page, pdu_format, pdu_specific, priority, self._device_address, data, time_limit, frame_format)
+        return self._ecu.send_pgn(data_page, pdu_format, pdu_specific, priority, self._device_address, data, time_limit, frame_format, dest_address)
 
     def send_request(self, data_page, pgn, destination):
         """send a request message

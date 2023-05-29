@@ -87,18 +87,15 @@ class J1939_21:
         """
         return ((src_address & 0xFF) << 8) | (dest_address & 0xFF)
 
-    def send_pgn(self, data_page, pdu_format, pdu_specific, priority, src_address, data, time_limit, frame_format):
+    def send_pgn(self, data_page, pdu_format, pdu_specific, priority, src_address, data, time_limit, frame_format, dest_address=ParameterGroupNumber.Address.GLOBAL):
         pgn = ParameterGroupNumber(data_page, pdu_format, pdu_specific)
         if len(data) <= 8:
             # send normal message
             mid = MessageId(priority=priority, parameter_group_number=pgn.value, source_address=src_address)
             self.__send_message(mid.can_id, True, data)
         else:
-            # if the PF is between 0 and 239, the message is destination dependent when pdu_specific != 255
-            # if the PF is between 240 and 255, the message can only be broadcast
-            if (pdu_specific == ParameterGroupNumber.Address.GLOBAL) or ParameterGroupNumber(0, pdu_format, pdu_specific).is_pdu2_format:
-                dest_address = ParameterGroupNumber.Address.GLOBAL
-            else:
+            # if the PF is between 0 and 239, the destination of the message is given by pdu_specific
+            if pgn.is_pdu1_format:
                 dest_address = pdu_specific
 
             # init sequence
@@ -110,7 +107,7 @@ class J1939_21:
             message_size = len(data)
             num_packets = int(message_size / 7) if (message_size % 7 == 0) else int(message_size / 7) + 1
 
-            # if the PF is between 240 and 255, the message can only be broadcast
+            # BAM is used when the desination address is 255
             if dest_address == ParameterGroupNumber.Address.GLOBAL:
                 # send BAM
                 self.__send_tp_bam(src_address, priority, pgn.value, message_size, num_packets)
@@ -125,7 +122,7 @@ class J1939_21:
                         "state": self.SendBufferState.SENDING_BM,
                         "deadline": time.time() + self._minimum_tp_bam_dt_interval,
                         'src_address' : src_address,
-                        'dest_address' : ParameterGroupNumber.Address.GLOBAL,
+                        'dest_address' : dest_address,
                         'next_packet_to_send' : 0,
                     }
             else:
@@ -141,11 +138,11 @@ class J1939_21:
                         "state": self.SendBufferState.WAITING_CTS,
                         "deadline": time.time() + self.Timeout.T3,
                         'src_address' : src_address,
-                        'dest_address' : pdu_specific,
+                        'dest_address' : dest_address,
                         'next_packet_to_send' : 0,
                         'next_wait_on_cts': 0,
                     }
-                self.__send_tp_rts(src_address, pdu_specific, priority, pgn.value, message_size, num_packets, min(self._max_cmdt_packets, num_packets))
+                self.__send_tp_rts(src_address, dest_address, priority, pgn.value, message_size, num_packets, min(self._max_cmdt_packets, num_packets))
 
             self.__job_thread_wakeup()
 

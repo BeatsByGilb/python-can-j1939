@@ -190,7 +190,7 @@ class J1939_22:
     def __put_rts_cts_session(self, session):
         self.__rts_cts_session_list[session] = True
 
-    def send_pgn(self, data_page, pdu_format, pdu_specific, priority, src_address, data, time_limit, frame_format, tos=2, trailer_format=0):
+    def send_pgn(self, data_page, pdu_format, pdu_specific, priority, src_address, data, time_limit, frame_format, tos=2, trailer_format=0, dest_address=ParameterGroupNumber.Address.GLOBAL):
         pgn = ParameterGroupNumber(data_page, pdu_format, pdu_specific)
         data_length = len(data)
 
@@ -242,16 +242,17 @@ class J1939_22:
                         # get next buffer
                         session += 1
         else:
-            # if the PF is between 0 and 239, the message is destination dependent when pdu_specific != 255
-            # if the PF is between 240 and 255, the message can only be broadcast
-            if (pdu_specific == ParameterGroupNumber.Address.GLOBAL) or ParameterGroupNumber(0, pdu_format, pdu_specific).is_pdu2_format:
-                dest_address = ParameterGroupNumber.Address.GLOBAL
+            # if the PF is between 0 and 239, the destination of the message is given by pdu_specific
+            if pgn.is_pdu1_format:
+                dest_address = pdu_specific
+            
+            # get session number
+            if dest_address == ParameterGroupNumber.Address.GLOBAL:
                 session_num = self.__get_bam_session()
                 if session_num == None:
                     #print('bam session not available')
                     return False
             else:
-                dest_address = pdu_specific
                 session_num = self.__get_rts_cts_session()
                 if session_num == None:
                     #print('rts/cts session not available')
@@ -275,7 +276,7 @@ class J1939_22:
             if len(list_of_arr) > 1:
                 data_list.append(list_of_arr[1].tolist())
 
-            # if the PF is between 240 and 255, the message can only be broadcast
+            # BAM is used when the desination address is 255
             if dest_address == ParameterGroupNumber.Address.GLOBAL:
 
                 # send BAM
